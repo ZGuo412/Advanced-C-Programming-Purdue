@@ -1,0 +1,78 @@
+set logging file gdb.1.log
+set logging on
+set history filename gdb.1.history
+set history save
+run
+run Starting program: .../prime_factor
+run
+run prime_factor
+run .../prime_factor
+run
+ run
+Starting program: …/prime_factor
+run ./prime_factor
+run
+set logging file gdb.1.log
+set logging on
+set history filename gdb.1.history
+set history save
+run
+backtrace
+frame 1
+list
+print locals
+print local
+print n
+print local variables
+print variables
+print n
+break prime_factor
+break main
+run
+kill
+run
+step
+break 28
+print
+step
+break prime_factor.c:28
+run
+continuing
+ignore
+ignore 1
+list
+kill
+run
+disable 2
+disable 1
+disable
+run
+lisjt
+list
+backtrace
+frame 6
+list
+print locals
+print n
+break main
+run
+disable 5
+run
+backtrace
+frame 3
+list
+print n
+break main
+run
+step
+list
+break prime_factor.c:28
+run
+next
+print n
+step
+print n
+step
+print n
+quit
+quit
