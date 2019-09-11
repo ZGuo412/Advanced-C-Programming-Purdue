@@ -1,0 +1,338 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <stdbool.h>
+#include "maze.h"
+static int is_path(Maze *maze, int row, int col)
+{
+	if ((row >= 0) && (row < maze->n_row)) {
+		if ((col >= 0) && (col < maze->n_col)) {
+			return maze->maze_array[row][col] == PATH;
+		}
+	}
+	return 0;
+}
+int _find_steps(int row, int col, Coord destination,int steps, Maze *get_maze)
+{
+	if( row != destination.row || col != destination.col)
+	{
+		if (is_path(get_maze, row, col + 1) == 1)
+		{
+			steps = _find_steps(row,col + 1,destination,steps, get_maze);
+		}
+		if(is_path(get_maze, row, col - 1) == 1)
+		{
+			int steps_l = _find_steps(row,col - 1,destination,steps, get_maze);
+			if (steps_l < steps)
+			{
+				steps = steps_l;
+			}
+
+		}
+		if(is_path(get_maze, row + 1, col) == 1)
+		{
+	        int steps_u = _find_steps(row + 1,col,destination,steps, get_maze);
+			if (steps_u < steps)
+			{
+				steps = steps_u;
+			}
+	
+		}
+		if(is_path(get_maze, row - 1, col) == 1)
+		{
+			int steps_o = _find_steps(row - 1,col,destination,steps, get_maze);
+			if (steps_o < steps)
+			{
+				steps = steps_o;
+			}
+
+		}
+		steps++;
+        return steps;
+ 
+	}
+	else
+	{
+		return 0;
+	}
+
+}
+
+void _find_maze_dimensions(FILE * fp, int *n_row, int *n_col) 
+{
+	*n_row = *n_col = 0;
+	fseek(fp,0L,SEEK_SET);
+	int c = 0;
+	int number = 0;
+	while (true)
+	{
+		c = fgetc(fp);
+		if (feof(fp))
+		{
+			break;
+		}
+		if (c == '\n')
+		{
+			(*n_row)++;
+		}
+		else
+		{
+			number++;
+		}
+	}
+	*n_col = number / *n_row;
+	return;
+
+}
+void free_maze(Maze* maze)
+{
+	for (int i = 0; i < maze->n_row;i++){
+		free(maze->maze_array[i]);
+	}
+	free(maze->maze_array);
+	free(maze);
+	return;
+}
+Maze* malloc_maze(int n_row, int n_col)
+{
+	Maze* maze = malloc(sizeof(*maze));
+	if (maze == NULL){
+		return NULL;
+	}
+	maze->n_row = n_row;
+	maze->n_col = n_col;
+	maze->maze_array = malloc(sizeof(*maze->maze_array) * n_row);
+	if (maze->maze_array == NULL){
+		free(maze);
+		return NULL;
+	}
+	for (int i = 0; i < n_row; i++){
+		maze->maze_array[i] = malloc(sizeof(*maze->maze_array[i]) * n_col);
+		if (maze->maze_array[i] == NULL){
+			free_maze(maze);
+			return NULL;
+		}
+	}
+	return maze;
+}
+
+
+
+Maze* read_maze(FILE *fp)
+{  
+	int row = 0;
+	int col = 0;
+	int count = 0;
+	_find_maze_dimensions(fp,&row,&col);
+	Maze* new_maze = malloc_maze(row,col);
+	fseek(fp,0l,SEEK_SET);
+	while(true)
+	{
+		int c = fgetc(fp);
+		if(feof(fp))
+		{
+			break;
+		}
+		if (c != '\n')
+		{
+			new_maze->maze_array[count / col][count % col] = c;
+			count++;
+		}
+
+	}
+	return new_maze;
+}
+
+
+bool write_maze(const char* filename, const Maze* maze)
+{
+	FILE *fp = fopen(filename,"w");
+	if (fp == NULL)
+	{
+		return false;
+	}
+	fseek(fp,0L,SEEK_SET);
+	for (int i = 0; i < maze->n_row; i++)
+	{
+		for(int j = 0; j < maze->n_col; j++)
+		{
+			int maze_n = fputc(maze->maze_array[i][j],fp);
+			if (maze_n == EOF)
+			{
+				fclose(fp);
+				return false;
+			}
+		}
+		fputc('\n',fp);
+	}
+	fclose(fp);
+	return true;
+}
+
+
+
+/* given a maze, current row (curr),                                     */
+/* current column (curc), destination row (drow), destination col (dcol) */
+/* current distance from source, determine the where to explore from the */
+/* current location                                                      */
+/* a recursive function: from the current location, try 'N', 'S', 'E',   */
+/* 'W' locations one at a time if the attempt is successful, write the   */
+/* direction in the file                                                 */
+
+static int _pathfinder_helper(Maze *maze, int curr, int curc, int endr, int endc,
+		int count, FILE *dfptr)
+{
+	// you may uncomment this and use the output here to trace the function
+	// with sample5.pdf
+	// printf("(%d, %d), %d\n", curr, curc, count);
+	maze->maze_array[curr][curc] = VISITED;
+	if ((curr == endr) && (curc == endc)) { // reach the destination 
+		int i;
+		for (i = 0; i < count; i++) { // create enough space in file
+			fputc(VISITED, dfptr);
+		}
+		return count;
+	}
+
+	int found;
+	if (is_path(maze, curr-1, curc)) {
+		found = _pathfinder_helper(maze, curr-1, curc, endr, endc, count+1, dfptr);
+		if (found != -1) {
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			fputc('N', dfptr);
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			return found;
+		}
+	}
+	if (is_path(maze, curr+1, curc)) {
+		found = _pathfinder_helper(maze, curr+1, curc, endr, endc, count+1, dfptr);
+		if (found != -1) {
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			fputc('S', dfptr);
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			return found;
+		}
+	}
+	if (is_path(maze, curr, curc+1)) {
+		found = _pathfinder_helper(maze, curr, curc+1, endr, endc, count+1, dfptr);
+		if (found != -1) {
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			fputc('E', dfptr);
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			return found;
+		}
+	}
+	if (is_path(maze, curr, curc-1)) {
+		found = _pathfinder_helper(maze, curr, curc-1, endr, endc, count+1, dfptr);
+		if (found != -1) {
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			fputc('W', dfptr);
+			fseek(dfptr, -1, SEEK_CUR); // go back one position
+			return found;
+		}
+	}
+	return -1;
+}
+
+/* this is a function implemented by the instructor to illustrate           */
+/* how to use a recursive function to go from the left-most top entrance to */
+/* the right-most bottom exit of a maze.  The function will print the       */
+/* directions taken to reach the bottom exit, without visiting a location   */
+/* twice.  Note that the recursion may visit a location a few times         */
+/* Given three filenames, first one is a given maze, the second one is to   */
+/* be written with the directions, the third is the explored maze           */
+/* If the maze file does not exist, the function immediately return -1 and  */
+/* do nothing else                                                          */
+/* the directions are in the form of a series of characters                 */
+/* 'N', 'S', 'E', 'W', without spacing (and without the quotes).            */
+/* There should be just a single line, without a terminating newline        */
+/* character. In other words, to the vi editor, it is an incomplete file    */
+/* you are to assume that you start from the top-most, left-most entry      */
+/* of the maze.  Therefore, the first direction is always 'S'               */
+/* similarly, the last direction is always 'S'                              */
+/* the returned value should be the number of steps taken to reach          */
+/* the right-most bottom exit.  It is typically not the shortest distance   */
+/* Note that the maze can be generated by amaze, or some combinations of    */
+/* the maze expansion functions that you have written in PE08               */
+/* you may assume that the maze file, if it exists, is in the correct format*/
+
+int find_path_from_top_entrance_to_bottom_exit(char *maze_file, char *directions_file, char *visited_file)
+{
+	FILE *mfptr = fopen(maze_file, "r");
+	if (mfptr == NULL) {
+		return -1;
+	}
+
+	/* read the maze from mfptr */
+
+	Maze *maze = read_maze(mfptr);
+	fclose(mfptr);
+	if (maze == NULL) {
+		return -1;
+	}
+
+	/* find the starting location, the top-most, left-most opening */
+	int startr, startc;
+	startr = 0;
+	for (startc = 0; startc < maze->n_col; startc++) {
+		if (maze->maze_array[startr][startc] == PATH) {
+			break;
+		}
+	}
+
+	/* find the ending location, the bottom-most, right most opening */
+	int endr, endc;
+	endr = maze->n_row-1;
+	for (endc = maze->n_col-1; endc >= 0; endc--) {
+		if (maze->maze_array[endr][endc] == PATH) {
+			break;
+		}
+	} 
+
+	// no starting location, deallocate and return 
+	if (startc == maze->n_col) {
+		free_maze(maze);
+		return -1;
+	}
+	// no ending location, deallocate and return 
+	if (endc == -1) {
+		free_maze(maze);
+		return -1;
+	}
+
+	FILE *dfptr = fopen(directions_file, "w");
+	if (dfptr == NULL) {
+		free_maze(maze);
+		return -1;
+	}
+	int steps = _pathfinder_helper(maze, startr, startc, endr, endc, 0, dfptr);
+	write_maze(visited_file, maze);
+	fclose(dfptr);
+	free_maze(maze);
+	return steps;
+}
+
+
+int dfs_shortest_path_directions(char *maze_file, char *directions_file,
+		Coord source, Coord destination)
+{
+	int steps = 0;
+	int row = source.row;
+	int col = source.col;
+	FILE*fp = fopen(maze_file,"r");
+	if (fp == NULL)
+	{
+		return -1;
+	}
+	Maze* get_maze = read_maze(fp);
+    steps = _find_steps(row,col,destination,steps,get_maze);
+	fclose(fp);
+	return steps;
+}
+
+int simulate_movement(char *maze_file, char *directions_file, char *visited_file,
+		Coord source, Coord destination)
+{
+	return -1;
+}
+
